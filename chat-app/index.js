@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-// Importar o Prisma
 const { PrismaClient } = require('@prisma/client');
 
 const app = express();
@@ -15,6 +14,19 @@ const io = new Server(server, {
 
 // Inicializar o Banco de Dados
 const prisma = new PrismaClient();
+
+// --- NOVA FUNÇÃO AUXILIAR (REFATORAÇÃO) ---
+// Extraímos a lógica de formatação para cá.
+// Isso torna o código mais limpo e fácil de manter.
+function formatarMensagemParaEnvio(username, texto, data) {
+  return {
+    usuario: username,
+    texto: texto,
+    horario: new Date(data).toLocaleTimeString()
+  };
+}
+//---------------------------------------------
+
 
 app.get('/', (req, res) => {
   res.send('Chat com Banco de Dados ON! 🚀');
@@ -65,12 +77,14 @@ io.on('connection', (socket) => {
             include: { user: true }
         });
 
-        // Monta o objeto para mandar para a tela
-        const msgParaEnviar = {
-            usuario: novaMsg.user.username,
-            texto: novaMsg.text,
-            horario: new Date(novaMsg.createdAt).toLocaleTimeString()
-        };
+        // --- USO DA NOVA FUNÇÃO (REFATORAÇÃO) ---
+        // Antes a lógica estava "hardcoded" aqui. Agora chamamos a função.
+        const msgParaEnviar = formatarMensagemParaEnvio(
+            novaMsg.user.username,
+            novaMsg.text,
+            novaMsg.createdAt
+        );
+        // ----------------------------------------
 
         // Manda para todo mundo
         io.emit('receber_mensagem', msgParaEnviar);
