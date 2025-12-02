@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Chat App - MVP</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        #chat-box { height: 300px; border: 1px solid #ccc; overflow-y: scroll; padding: 10px; margin-bottom: 10px; }
+        .mensagem { margin-bottom: 5px; }
+        .sistema { color: gray; font-style: italic; font-size: 0.8em; }
+        .usuario { font-weight: bold; color: blue; }
+        #controles { display: none; } /* Escondido até logar */
+    </style>
+</head>
+<body>
+    <h2>Chat em Tempo Real 💬</h2>
+
+    <div id="login-area">
+        <input type="text" id="username" placeholder="Digite seu nome...">
+        <button onclick="entrarNoChat()">Entrar</button>
+    </div>
+
+    <div id="controles">
+        <div id="chat-box"></div>
+        <input type="text" id="mensagemInput" placeholder="Digite uma mensagem..." onkeypress="verificarEnter(event)">
+        <button onclick="enviarMensagem()">Enviar</button>
+    </div>
+
+    <script src="http://localhost:3001/socket.io/socket.io.js"></script>
+    
+    <script>
+        // Conecta ao backend
+        const socket = io('http://localhost:3001');
+
+        // Referências do DOM
+        const loginArea = document.getElementById('login-area');
+        const controles = document.getElementById('controles');
+        const chatBox = document.getElementById('chat-box');
+        const mensagemInput = document.getElementById('mensagemInput');
+        const usernameInput = document.getElementById('username');
+
+        // --- FUNÇÕES DE INTERFACE ---
+
+        function entrarNoChat() {
+            const usuario = usernameInput.value;
+            if (usuario.trim()) {
+                // Emite evento para o servidor
+                socket.emit('entrar_chat', usuario);
+                
+                // Troca a tela
+                loginArea.style.display = 'none';
+                controles.style.display = 'block';
+            }
+        }
+
+        function enviarMensagem() {
+            const texto = mensagemInput.value;
+            if (texto.trim()) {
+                // Envia para o servidor
+                socket.emit('enviar_mensagem', { texto });
+                mensagemInput.value = '';
+            }
+        }
+
+        function verificarEnter(event) {
+            if (event.key === 'Enter') enviarMensagem();
+        }
+
+        function adicionarNaTela(html) {
+            const div = document.createElement('div');
+            div.innerHTML = html;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight; // Rola para baixo
+        }
+
+        // --- EVENTOS DO SOCKET (Ouvindo o servidor) ---
+
+        // Quando alguém manda mensagem
+        socket.on('receber_mensagem', (msg) => {
+            const html = `<span class="usuario">${msg.usuario}</span> [${msg.horario}]: ${msg.texto}`;
+            adicionarNaTela(`<div class="mensagem">${html}</div>`);
+        });
+
+        // Quando o sistema avisa (Entrou/Saiu)
+        socket.on('mensagem_sistema', (texto) => {
+            adicionarNaTela(`<div class="sistema">${texto}</div>`);
+        });
+
+        socket.on('historico_mensagens', (mensagens) => {
+            // Limpa a caixa de chat para não duplicar se reconectar
+            chatBox.innerHTML = '';
+            
+            mensagens.forEach(msg => {
+                // Formata a hora, pois vem crua do banco
+                const horario = new Date(msg.createdAt).toLocaleTimeString();
+                
+                const html = `<span class="usuario">${msg.user.username}</span> [${horario}]: ${msg.text}`;
+                adicionarNaTela(`<div class="mensagem" style="color: #555;">${html}</div>`);
+            });
+            
+            adicionarNaTela(`<div class="sistema">--- Histórico Carregado do Banco ---</div>`);
+        });
+    </script>
+</body>
+</html>
